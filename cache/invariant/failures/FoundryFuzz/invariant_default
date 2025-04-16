@@ -1,0 +1,1 @@
+[{"sender":"0x0000000000000000000000000000000000003181","addr":"0x7fa9385be102ac3eac297483dd6233d62b3e1496","calldata":"0x57cee9aa0000000000000000000000000000000000000000000000000000000000000000","contract_name":"test/fuzzing/FoundryFuzz.sol:FoundryFuzz","signature":"fuzz_sampleFailWithRequire(bool)","args":"false"}]

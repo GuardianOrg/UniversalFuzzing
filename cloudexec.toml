@@ -1,0 +1,53 @@
+#NOTE: in this repo will not work fatal: not a git repository (or any of the parent directories): .git 
+
+# Set the directory to upload to the server.
+
+[input]
+jobName = "Sample Fuzzing Test"
+directory = "."
+timeout = "96h"
+
+[commands]
+setup = '''
+# Install Slither and its dependencies
+   echo "Installing solc and slither..."
+    python3 -m venv ~/venv
+    source ~/venv/bin/activate
+    pip3 install solc-select slither-analyzer crytic-compile
+    solc-select install 0.8.25
+    solc-select use 0.8.25
+
+# Install Echidna
+if ! command -v echidna >/dev/null 2>&1; then
+    echo "Installing echidna..."
+    curl -Lo /tmp/echidna.tar.gz \
+        https://github.com/crytic/echidna/releases/download/v2.2.6/echidna-2.2.6-x86_64-linux.tar.gz
+    tar -xzf /tmp/echidna.tar.gz -C /tmp
+    mv /tmp/echidna /usr/local/bin
+    rm /tmp/echidna.tar.gz
+fi
+
+# Install Foundry
+if ! command -v forge >/dev/null 2>&1; then
+    echo "Installing Foundry..."
+    curl -L https://foundry.paradigm.xyz | bash
+    
+    # Add Foundry to PATH and make it persistent
+    export PATH="/.foundry/bin:$PATH"
+    echo 'export PATH="/.foundry/bin:$PATH"' >> /.bashrc
+    
+    # Initialize Foundry
+    /.foundry/bin/foundryup
+    
+    # Verify installation
+    echo "=== Verifying Foundry Installation ==="
+    /.foundry/bin/forge --version
+fi
+
+# Source bashrc to apply all PATH changes
+source /.bashrc
+'''
+
+#NOTE: SET TIMEOUT 10 mins left to save time for coverage
+
+run = "export PATH=\"/root/venv/bin:/.foundry/bin:$PATH\" && echo 'Current PATH:' && echo $PATH && echo 'Current directory:' && pwd && echo 'Directory contents:' && ls -la && rm -rf lib && forge install --no-commit foundry-rs/forge-std && forge install --no-commit perimetersec/fuzzlib@main && forge install --no-commit chiru-labs/ERC721A && forge install --no-commit OpenZeppelin/openzeppelin-contracts@v4.9.0 && forge install --no-commit OpenZeppelin/openzeppelin-contracts-upgradeable@v4.9.0 && forge install --no-commit OpenZeppelin/openzeppelin-foundry-upgrades && forge install --no-commit Uniswap/permit2 && forge install --no-commit Uniswap/swap-router-contracts && forge install --no-commit Uniswap/v3-core && forge remappings && echo 'Final directory state:' && ls -la && rm -rf crytic-export && forge clean && echidna . --contract Fuzz --config echidna-cloud.yaml"

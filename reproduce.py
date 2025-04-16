@@ -1,0 +1,88 @@
+import re
+
+
+def convert_to_solidity(call_sequence):
+    # Regex patterns to extract the necessary parts
+    call_pattern = re.compile(
+        r"(?:Fuzz\.)?(\w+\([^\)]*\))(?: from: (0x[0-9a-fA-F]{40}))?(?: Gas: (\d+))?(?: Time delay: (\d+) seconds)?(?: Block delay: (\d+))?"
+    )
+    wait_pattern = re.compile(
+        r"\*wait\*(?: Time delay: (\d+) seconds)?(?: Block delay: (\d+))?"
+    )
+
+    solidity_code = "function test_replay() public {\n"
+
+    lines = call_sequence.strip().split("\n")
+    last_index = len(lines) - 1
+
+    for i, line in enumerate(lines):
+        call_match = call_pattern.search(line)
+        wait_match = wait_pattern.search(line)
+        if call_match:
+            call, from_addr, gas, time_delay, block_delay = call_match.groups()
+
+            # Add prank line if from address exists
+            # if from_addr:
+            #     solidity_code += f'    vm.prank({from_addr});\n'
+
+            # Add warp line if time delay exists
+            if time_delay:
+                solidity_code += f"    vm.warp(block.timestamp + {time_delay});\n"
+
+            # Add roll line if block delay exists
+            if block_delay:
+                solidity_code += f"    vm.roll(block.number + {block_delay});\n"
+
+            if "collateralToMarketId" in call:
+                continue
+
+            # Add function call
+            if i < last_index:
+                solidity_code += f"    try this.{call} {{}} catch {{}}\n"
+            else:
+                solidity_code += f"    {call};\n"
+            solidity_code += "\n"
+        elif wait_match:
+            time_delay, block_delay = wait_match.groups()
+
+            # Add warp line if time delay exists
+            if time_delay:
+                solidity_code += f"    vm.warp(block.timestamp + {time_delay});\n"
+
+            # Add roll line if block delay exists
+            if block_delay:
+                solidity_code += f"    vm.roll(block.number + {block_delay});\n"
+            solidity_code += "\n"
+
+    solidity_code += "}\n"
+
+    return solidity_code
+
+
+# Example usage
+call_sequence = """
+ Fuzz.fuzz_resolveEscalatedDispute(1524785993,285833704779,82408415642276618740126264533915496262775088082190294333484700150794750947088,23077624776193574883854634310162681106309305218598970187917225506707300826688,1524785991) from: 0x0000000000000000000000000000000000010000 Time delay: 225906 seconds Block delay: 32
+    Fuzz.fuzz_mint(1) from: 0x0000000000000000000000000000000000010000 Time delay: 482712 seconds Block delay: 53562
+    Fuzz.fuzz_guided_fullResolutionFlow(66348356308104072936732571130984210026888813262516505652267858926036889762462,1524785991,812,32158772534449494943507178436403640866108270822261042897422430874563061732263,109399446502818066747468645802561400896082880365300881782986834946470647043797,4370000,2974932620975930020426307658396294969668280800326032391151266321348219663777) from: 0x0000000000000000000000000000000000010000 Time delay: 127 seconds Block delay: 6234
+    Fuzz.fuzz_guided_disputeFlow(93407263361063426781625998043839765134110067491666348234112080418772621068772,1524785993,4370000,94792066266531918431641987563236954201242668139567149215097193237765546243323) from: 0x0000000000000000000000000000000000020000 Time delay: 463588 seconds Block delay: 32767
+    Fuzz.fuzz_openAndSetEscalation() from: 0x0000000000000000000000000000000000030000 Time delay: 361136 seconds Block delay: 18429
+    Fuzz.fuzz_openAndSetEscalation() from: 0x0000000000000000000000000000000000020000 Time delay: 82670 seconds Block delay: 800
+    Fuzz.fuzz_voteForDispute(32271446278284179717479088475412390727873720474211159417106256586589094565383,1524785992,4370001,1524785993) from: 0x0000000000000000000000000000000000010000 Time delay: 338920 seconds Block delay: 32737
+    Fuzz.fuzz_guided_disputeFlow(2248968270484080566991994652564736526325122865421706781887710859643209,23041,5994970569476486200468943778670381952641309945784064363056612695861149,0) from: 0x0000000000000000000000000000000000010000 Time delay: 597457 seconds Block delay: 58783
+    Fuzz.fuzz_proposeResolution(115792089237316195423570985008687907853269984665640564039457584007913129639932) from: 0x0000000000000000000000000000000000030000 Time delay: 50417 seconds Block delay: 3661
+    Fuzz.fuzz_voteForDispute(72573581968984275184646803256967414558766377903997269633152495739512212598749,40,76091485795564668551385910557913203269237560097974941093702944233565243379603,4370001) from: 0x0000000000000000000000000000000000030000 Time delay: 463587 seconds Block delay: 5952
+    Fuzz.fuzz_mint(657) from: 0x0000000000000000000000000000000000020000 Time delay: 127251 seconds Block delay: 2512
+    Fuzz.fuzz_voteForDispute(4370000,1524785991,4370000,4369999) from: 0x0000000000000000000000000000000000020000 Time delay: 40089 seconds Block delay: 36859
+    Fuzz.fuzz_openAndSetEscalation() from: 0x0000000000000000000000000000000000020000 Time delay: 332369 seconds Block delay: 32767
+    Fuzz.fuzz_guided_disputeFlow(4370001,714,1524785993,1524785992) from: 0x0000000000000000000000000000000000010000 Time delay: 82670 seconds Block delay: 53678
+    Fuzz.fuzz_castOneVoteForDispute(26652056309550711573217882080798267706746282863386893414828146803632659736272,73903667194014136182643403763818326029758832322011027229358189707054345845653,106792304101264483833143144722044512185685204275825053801281340701561430131051,1524785991) from: 0x0000000000000000000000000000000000030000 Time delay: 254414 seconds Block delay: 60267
+    Fuzz.fuzz_mint(4370000) from: 0x0000000000000000000000000000000000010000 Time delay: 141072 seconds Block delay: 23403
+    Fuzz.fuzz_voteForDispute(1524785993,16148682081647928593991157017880022557144247238358506390373723343620707454006,34351719749371152076840702694028622311905823270827918835733132262350759045523,1524785991) from: 0x0000000000000000000000000000000000010000 Time delay: 135921 seconds Block delay: 5054
+    Fuzz.fuzz_guided_fullResolutionFlow(4369999,115792089237316195423570985008687907853269984665640564039457584007913129639932,944,4369999,4370000,35168207088651127352747010606771030769630742514141276523330561213502259011,94108762915175569527157879858203284125673242773130709263554977711888489863240) from: 0x0000000000000000000000000000000000020000 Time delay: 414736 seconds Block delay: 4101
+    Fuzz.fuzz_openAndSetEscalation() from: 0x0000000000000000000000000000000000030000 Time delay: 33605 seconds Block delay: 35248
+    Fuzz.fuzz_guided_fullResolutionFlow(181392653075316,26581092912296651108,0,15904891879251164082,2594221954018520945080486,0,0) from: 0x0000000000000000000000000000000000030000 Time delay: 289103 seconds Block delay: 46422
+    Fuzz.fuzz_redeem(115792089237316195423570985008687907853269984665640564039457584007913129639931) from: 0x0000000000000000000000000000000000030000 Time delay: 401699 seconds Block delay: 5443   
+"""
+
+solidity_code = convert_to_solidity(call_sequence)
+print(solidity_code)
